@@ -2,12 +2,17 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { publicApi } from "../../api/publicApi";
+import { useProductCategories } from "../../hooks/useSiteData";
 
 export function HeaderSearchModal({ open, onClose }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const categoriesQuery = useProductCategories();
+  const categories = [...(categoriesQuery.data?.items || [])].sort(
+    (a, b) => (b.productCount || 0) - (a.productCount || 0) || a.id.localeCompare(b.id)
+  );
 
   useEffect(() => {
     if (!open) {
@@ -64,26 +69,45 @@ export function HeaderSearchModal({ open, onClose }) {
         onClick={(e) => e.stopPropagation()}
       >
         <form className="header-search-modal-form" onSubmit={handleSubmit}>
-          <span className="header-search-icon">🔍</span>
-          <input
-            type="text"
-            className="header-search-input"
-            placeholder="Tìm kiếm sản phẩm điêu khắc, phù điêu, hoa văn..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            autoFocus
-          />
-          {query && (
-            <button
-              type="button"
-              className="header-search-clear"
-              onClick={() => setQuery("")}
-            >
-              ✕
-            </button>
-          )}
+          <div className="header-search-field">
+            <span className="header-search-icon" aria-hidden="true">🔍</span>
+            <input
+              type="search"
+              enterKeyHint="search"
+              className="header-search-input"
+              placeholder="Tìm sản phẩm, phù điêu, hoa văn..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              autoFocus
+            />
+            {query && (
+              <button
+                type="button"
+                className="header-search-clear"
+                onClick={() => setQuery("")}
+                aria-label="Xóa từ khóa"
+              >
+                ×
+              </button>
+            )}
+          </div>
           <button type="submit" className="button button--primary header-search-submit">
             Tìm kiếm
+          </button>
+          <button
+            type="button"
+            className="header-search-close"
+            onClick={onClose}
+            aria-label="Đóng tìm kiếm"
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+              <path
+                d="M6 6l12 12M18 6L6 18"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
         </form>
 
@@ -126,28 +150,23 @@ export function HeaderSearchModal({ open, onClose }) {
               Không tìm thấy sản phẩm trùng khớp với "{query}"
             </div>
           ) : (
-            <div className="header-search-popular">
-              <span className="header-search-section-label">Từ khóa phổ biến</span>
-              <div className="header-search-tags">
-                {[
-                  "Phù điêu đầu rồng",
-                  "Tượng thạch cao",
-                  "Hoa văn đền chùa",
-                  "Bê tông đúc sẵn",
-                  "Cột tân cổ điển",
-                  "Linh vật ngoại thất"
-                ].map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    className="header-search-tag-chip"
-                    onClick={() => setQuery(tag)}
-                  >
-                    {tag}
-                  </button>
-                ))}
+            categories.length > 0 && (
+              <div className="header-search-popular">
+                <span className="header-search-section-label">Danh mục sản phẩm</span>
+                <div className="header-search-tags">
+                  {categories.map((category) => (
+                    <Link
+                      key={category.id}
+                      to={`/san-pham?categoryId=${category.id}`}
+                      className="header-search-tag-chip"
+                      onClick={onClose}
+                    >
+                      {category.name}
+                    </Link>
+                  ))}
+                </div>
               </div>
-            </div>
+            )
           )}
         </div>
       </div>

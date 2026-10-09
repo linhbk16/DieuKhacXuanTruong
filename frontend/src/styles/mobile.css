@@ -42,10 +42,13 @@
   .modal-category-card__name { white-space: normal; overflow-wrap: anywhere; }
   .modal-category-card__check { flex-shrink: 0; }
   .catalog-modal__close-btn, .modal-search-box__clear { min-width: 44px; min-height: 44px; }
-  .header-search-modal-overlay { padding-top: 16px; }
-  .header-search-modal-box { max-height: calc(100dvh - 32px); overflow-y: auto; }
-  .header-search-modal-form { padding: 12px; gap: 8px; }
-  .header-search-input { min-width: 0; }
+  .header-search-modal-overlay { padding-top: 12px; }
+  .header-search-modal-box { width: calc(100% - 24px); max-height: calc(100dvh - 24px); border-radius: 20px; }
+  .header-search-modal-form { padding: 10px; gap: 8px; }
+  .header-search-field { height: 44px; padding-left: 12px; gap: 8px; }
+  .header-search-input { font-size: 1rem; }
+  .header-search-submit { display: none; }
+  .header-search-results-panel { max-height: none; padding: 14px 16px 18px; }
   .product-card__title-link { display: block; padding-block: 6px; }
   .product-card__body h3 { font-size: 1rem !important; line-height: 1.45 !important; }
   .product-card__body p { font-size: .9rem !important; }
