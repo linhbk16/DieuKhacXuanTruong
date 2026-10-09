@@ -7,6 +7,7 @@ import { EmptyState } from "../components/common/EmptyState";
 import { ErrorState } from "../components/common/ErrorState";
 import { LoadingScreen } from "../components/common/LoadingScreen";
 import { Seo } from "../components/common/Seo";
+import { CatalogCategorySelect } from "../components/product/CatalogCategorySelect";
 import { ProductCard } from "../components/product/ProductCard";
 import { useProductCategories } from "../hooks/useSiteData";
 
@@ -160,8 +161,8 @@ export function ProductsPage() {
     (a, b) => (a.name || "").localeCompare(b.name || "", "vi", { sensitivity: "base", numeric: true })
   ), [categories]);
   const totalItems = pages[0]?.pagination?.totalItems || products.length;
+  const totalCatalogProducts = categories.reduce((sum, cat) => sum + (cat.productCount || 0), 0);
 
-  const activeCategory = categories.find((cat) => cat.id === filters.categoryId);
   const hasActiveFilter = Boolean(filters.categoryId || filters.search);
   const activeFilterCount = (filters.categoryId ? 1 : 0) + (filters.search ? 1 : 0);
 
@@ -218,65 +219,35 @@ export function ProductsPage() {
 
       <section className="section section--catalog-compact">
         <div className="container container--wide">
-          {/* Active Filter Bar (Chỉ hiển thị khi đang lọc hoặc tìm kiếm) */}
-          {hasActiveFilter ? (
-            <div className="catalog-active-filter-bar">
-              <div className="catalog-active-filter-chips">
-                <span className="active-filter-label">Đang lọc:</span>
-                {filters.categoryId && activeCategory ? (
-                  <span className="active-chip">
-                    <span>{getCategoryIcon(activeCategory.name)} {activeCategory.name}</span>
-                    <button
-                      type="button"
-                      onClick={() => updateFilters({ ...filters, categoryId: "" })}
-                      title="Bỏ lọc danh mục"
-                      aria-label="Bỏ chọn danh mục"
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ) : null}
-                {filters.search ? (
-                  <span className="active-chip">
-                    <span>🔍 "{filters.search}"</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSearchInput("");
-                        updateFilters({ ...filters, search: "" });
-                      }}
-                      title="Xóa từ khóa"
-                      aria-label="Xóa từ khóa tìm kiếm"
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ) : null}
-              </div>
-              <div className="catalog-active-filter-actions">
-                <span className="active-filter-count">
-                  Hiển thị <strong>{displayProducts.length}</strong> sản phẩm
-                </span>
+          {/* Compact sticky toolbar: category dropdown + active keyword, kept slim for small screens */}
+          <div className="catalog-toolbar">
+            <CatalogCategorySelect
+              categories={alphabeticalCategories}
+              activeCategoryId={filters.categoryId}
+              totalProducts={totalCatalogProducts}
+              onSelect={selectCategory}
+            />
+            {filters.search ? (
+              <span className="catalog-toolbar__chip">
+                <span className="catalog-toolbar__chip-text">"{filters.search}"</span>
                 <button
                   type="button"
-                  className="active-filter-edit-btn"
-                  onClick={() => setFilterModalOpen(true)}
-                >
-                  ⚙️ Đổi bộ lọc
-                </button>
-                <button
-                  type="button"
-                  className="active-filter-clear-all"
                   onClick={() => {
                     setSearchInput("");
-                    updateFilters({ categoryId: "", search: "" });
+                    updateFilters({ ...filters, search: "" });
                   }}
+                  aria-label="Xóa từ khóa tìm kiếm"
                 >
-                  ✕ Bỏ lọc
+                  ×
                 </button>
-              </div>
-            </div>
-          ) : null}
+              </span>
+            ) : null}
+            {hasActiveFilter ? (
+              <span className="catalog-toolbar__count">
+                <strong>{totalItems}</strong> sản phẩm
+              </span>
+            ) : null}
+          </div>
 
           {/* Full Width Catalog Product List */}
           <div className="catalog-full-content">
@@ -296,17 +267,19 @@ export function ProductsPage() {
                       <div className="catalog-category-block__header">
                         <div className="catalog-category-block__title-area">
                           <h2 className="catalog-category-block__title">
-                            {group.category.name}
+                            {group.category.id !== "other" ? (
+                              <button
+                                type="button"
+                                className="catalog-category-block__title-btn"
+                                onClick={() => selectCategory(group.category.id)}
+                                title={`Xem sản phẩm ${group.category.name}`}
+                              >
+                                {group.category.name}
+                              </button>
+                            ) : (
+                              group.category.name
+                            )}
                           </h2>
-                          {group.category.id !== "other" && (
-                            <button
-                              type="button"
-                              className="catalog-category-block__filter-link"
-                              onClick={() => updateFilters({ ...filters, categoryId: group.category.id })}
-                            >
-                              Xem riêng {group.category.name} →
-                            </button>
-                          )}
                         </div>
                       </div>
 
