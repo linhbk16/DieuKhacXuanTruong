@@ -11,7 +11,7 @@ export function HeaderSearchModal({ open, onClose }) {
   const navigate = useNavigate();
   const categoriesQuery = useProductCategories();
   const categories = [...(categoriesQuery.data?.items || [])].sort(
-    (a, b) => (b.productCount || 0) - (a.productCount || 0) || a.id.localeCompare(b.id)
+    (a, b) => (a.name || "").localeCompare(b.name || "", "vi", { sensitivity: "base", numeric: true })
   );
 
   useEffect(() => {

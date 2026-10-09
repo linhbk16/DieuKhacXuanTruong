@@ -148,6 +148,9 @@ export function ProductsPage() {
   const categories = useMemo(() => [...(categoriesQuery.data?.items || [])].sort(
     (a, b) => (b.productCount || 0) - (a.productCount || 0) || a.id.localeCompare(b.id)
   ), [categoriesQuery.data]);
+  const alphabeticalCategories = useMemo(() => [...categories].sort(
+    (a, b) => (a.name || "").localeCompare(b.name || "", "vi", { sensitivity: "base", numeric: true })
+  ), [categories]);
   const totalItems = pages[0]?.pagination?.totalItems || products.length;
 
   const activeCategory = categories.find((cat) => cat.id === filters.categoryId);
@@ -488,7 +491,7 @@ export function ProductsPage() {
                     </span>
                   </button>
 
-                  {categories.map((cat) => {
+                  {alphabeticalCategories.map((cat) => {
                     const isSelected = filters.categoryId === cat.id;
                     const count = cat.productCount || 0;
                     return (

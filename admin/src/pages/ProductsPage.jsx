@@ -171,7 +171,9 @@ export function ProductsPage() {
     message.success("Đã điền khung mô tả kỹ thuật mẫu.");
   };
 
-  const categories = categoriesQuery.data?.items || [];
+  const categories = [...(categoriesQuery.data?.items || [])].sort((a, b) =>
+    (a.name || "").localeCompare(b.name || "", "vi", { sensitivity: "base", numeric: true })
+  );
   const products = productsQuery.data?.items || [];
 
   const columns = [
