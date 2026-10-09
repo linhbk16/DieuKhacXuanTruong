@@ -93,6 +93,14 @@ export function ProductsPage() {
     setSearchParams(params, { replace: true, preventScrollReset: true });
   };
 
+  // Picking a category applies it right away and shows the products, no extra confirm step.
+  const selectCategory = (categoryId) => {
+    updateFilters({ ...filters, categoryId });
+    setFilterModalOpen(false);
+    // Wait for the modal to unlock body scroll before jumping back to the product list.
+    setTimeout(() => window.scrollTo({ top: 0 }), 50);
+  };
+
   // Debounced search to avoid triggering reload / unmount on every keystroke
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -477,7 +485,7 @@ export function ProductsPage() {
                   <button
                     type="button"
                     className={`modal-category-card ${!filters.categoryId ? "active" : ""}`}
-                    onClick={() => updateFilters({ ...filters, categoryId: "" })}
+                    onClick={() => selectCategory("")}
                   >
                     <div className="modal-category-card__left">
                       <span className="modal-category-card__icon">✨</span>
@@ -499,7 +507,7 @@ export function ProductsPage() {
                         key={cat.id}
                         type="button"
                         className={`modal-category-card ${isSelected ? "active" : ""} ${count === 0 ? "modal-category-card--empty" : ""}`}
-                        onClick={() => updateFilters({ ...filters, categoryId: isSelected ? "" : cat.id })}
+                        onClick={() => selectCategory(cat.id)}
                       >
                         <div className="modal-category-card__left">
                           <span className="modal-category-card__icon">{getCategoryIcon(cat.name)}</span>
