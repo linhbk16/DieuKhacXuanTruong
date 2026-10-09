@@ -10,46 +10,6 @@ import { Seo } from "../components/common/Seo";
 import { ProductCard } from "../components/product/ProductCard";
 import { useProductCategories } from "../hooks/useSiteData";
 
-const popularTagGroups = [
-  {
-    title: "Phân loại quy cách",
-    tags: [
-      { label: "Cột vuông", query: "Cột vuông" },
-      { label: "Cột tròn", query: "Cột tròn" },
-      { label: "Chân tròn", query: "Chân tròn" },
-      { label: "Ốp mảnh", query: "mảnh" }
-    ]
-  },
-  {
-    title: "Kích thước cột vuông",
-    tags: [
-      { label: "70x90", query: "70x90" },
-      { label: "60x85", query: "60x85" },
-      { label: "55x85", query: "55x85" },
-      { label: "50x45", query: "50x45" },
-      { label: "45x40", query: "45x40" },
-      { label: "40x32", query: "40x32" },
-      { label: "35x32", query: "35x32" },
-      { label: "30x37", query: "30x37" },
-      { label: "25x25", query: "25x25" },
-      { label: "20x24", query: "20x24" }
-    ]
-  },
-  {
-    title: "Kích thước tròn & chân đế",
-    tags: [
-      { label: "10x17", query: "10x17" },
-      { label: "15x22", query: "15x22" },
-      { label: "18x27", query: "18x27" },
-      { label: "20x22", query: "20x22" },
-      { label: "22x25", query: "22x25" },
-      { label: "24x25", query: "24x25" },
-      { label: "Chân tròn 30", query: "Chân tròn 30" },
-      { label: "38x33", query: "38x33" }
-    ]
-  }
-];
-
 const getCategoryIcon = (name = "") => {
   const lower = name.toLowerCase();
   if (lower.includes("cột") || lower.includes("đấu")) return "🏛️";
@@ -66,7 +26,7 @@ export function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const categoriesQuery = useProductCategories();
   const loadMoreRef = useRef(null);
-  const modalSearchInputRef = useRef(null);
+  const modalCloseRef = useRef(null);
   const viewMode = "grid";
 
   const filters = {
@@ -106,12 +66,12 @@ export function ProductsPage() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
-  // Lock body scroll & focus search input when filter modal is open
+  // Focus a non-input control so opening categories does not raise the mobile keyboard.
   useEffect(() => {
     if (filterModalOpen) {
       document.body.style.overflow = "hidden";
       const timer = setTimeout(() => {
-        modalSearchInputRef.current?.focus();
+        modalCloseRef.current?.focus({ preventScroll: true });
       }, 100);
       const handleKeyDown = (e) => {
         if (e.key === "Escape") setFilterModalOpen(false);
@@ -144,10 +104,10 @@ export function ProductsPage() {
   }, [searchInput]);
 
   const productsQuery = useInfiniteQuery({
-    queryKey: ["public-products", filters],
+    queryKey: ["public-products", filters, "category-popularity"],
     initialPageParam: 1,
     queryFn: ({ pageParam }) =>
-      publicApi.getProducts({ ...filters, page: pageParam, limit: 36 }),
+      publicApi.getProducts({ ...filters, sort: "category-popularity", page: pageParam, limit: 36 }),
     placeholderData: (previousData) => previousData,
     getNextPageParam: (lastPage) => {
       const pagination = lastPage?.pagination;
@@ -185,7 +145,9 @@ export function ProductsPage() {
 
   const pages = productsQuery.data?.pages || [];
   const products = pages.flatMap((page) => page.items || []);
-  const categories = categoriesQuery.data?.items || [];
+  const categories = useMemo(() => [...(categoriesQuery.data?.items || [])].sort(
+    (a, b) => (b.productCount || 0) - (a.productCount || 0) || a.id.localeCompare(b.id)
+  ), [categoriesQuery.data]);
   const totalItems = pages[0]?.pagination?.totalItems || products.length;
 
   const activeCategory = categories.find((cat) => cat.id === filters.categoryId);
@@ -378,7 +340,7 @@ export function ProductsPage() {
                       updateFilters({ categoryId: "", search: "" });
                     }}
                   >
-                    ✕ Bỏ tất cả lọc để xem 35 mẫu
+                    ✕ Bỏ lọc để xem tất cả sản phẩm
                   </button>
                 </div>
               </div>
@@ -471,15 +433,16 @@ export function ProductsPage() {
             <div className="catalog-modal__header">
               <div className="catalog-modal__header-titles">
                 <h3 className="catalog-modal__title">
-                  🏛️ Tìm Kiếm & Lọc Tác Phẩm
+                  🏛️ Tìm kiếm sản phẩm
                 </h3>
                 <p className="catalog-modal__subtitle">
-                  Chọn phân loại kiến trúc hoặc tìm nhanh mẫu điêu khắc, kích thước phù hợp
+                  Chọn danh mục hoặc tìm theo tên, kích thước sản phẩm
                 </p>
               </div>
               <button
                 type="button"
                 className="catalog-modal__close-btn"
+                ref={modalCloseRef}
                 onClick={() => setFilterModalOpen(false)}
                 aria-label="Đóng bộ lọc"
                 title="Đóng (Esc)"
@@ -490,82 +453,7 @@ export function ProductsPage() {
 
             {/* Body */}
             <div className="catalog-modal__body">
-              {/* Section 1: Search Input */}
-              <div className="catalog-modal__section">
-                <label className="modal-section-label" htmlFor="catalog-modal-search">
-                  🔍 Tìm kiếm theo tên hoặc kích thước
-                </label>
-                <div className="modal-search-box">
-                  <span className="modal-search-box__icon">🔍</span>
-                  <input
-                    id="catalog-modal-search"
-                    ref={modalSearchInputRef}
-                    type="text"
-                    className="modal-search-box__input"
-                    placeholder="Vd: 60x85, D40, đầu cột, phù điêu..."
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                  />
-                  {searchInput ? (
-                    <button
-                      type="button"
-                      className="modal-search-box__clear"
-                      onClick={() => {
-                        setSearchInput("");
-                        updateFilters({ ...filters, search: "" });
-                      }}
-                      aria-label="Xóa từ khóa"
-                    >
-                      ✕
-                    </button>
-                  ) : null}
-                </div>
-
-                {/* Live Match Preview Indicator */}
-                {searchInput ? (
-                  <div className="modal-live-match-indicator">
-                    <span className="modal-live-match-text">
-                      🔍 Tìm thấy <strong>{displayProducts.length}</strong> sản phẩm phù hợp
-                    </span>
-                  </div>
-                ) : null}
-
-                {/* Quick Keyword & Dimension Chip Groups */}
-                <div className="modal-quick-tags-container">
-                  {popularTagGroups.map((group) => (
-                    <div key={group.title} className="modal-quick-tags-group">
-                      <span className="modal-quick-tags__group-title">
-                        {group.title}:
-                      </span>
-                      <div className="modal-quick-tags__list">
-                        {group.tags.map((tag) => {
-                          const isActive = searchInput.toLowerCase() === tag.query.toLowerCase();
-                          return (
-                            <button
-                              key={tag.label}
-                              type="button"
-                              className={`modal-tag-chip ${isActive ? "active" : ""}`}
-                              onClick={() => {
-                                if (isActive) {
-                                  setSearchInput("");
-                                  updateFilters({ ...filters, search: "" });
-                                } else {
-                                  setSearchInput(tag.query);
-                                  updateFilters({ ...filters, search: tag.query });
-                                }
-                              }}
-                            >
-                              {isActive ? `✓ ${tag.label}` : tag.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Section 2: Categories 2-Column Grid */}
+              {/* Categories come first; the list scrolls independently on small screens. */}
               <div className="catalog-modal__section">
                 <div className="modal-section-head">
                   <span className="modal-section-label">🏛️ Danh mục sản phẩm</span>
@@ -592,7 +480,7 @@ export function ProductsPage() {
                       <span className="modal-category-card__icon">✨</span>
                       <div className="modal-category-card__text">
                         <span className="modal-category-card__name">Tất cả danh mục</span>
-                        <span className="modal-category-card__count">{totalItems} mẫu sản phẩm</span>
+                        <span className="modal-category-card__count">Xem toàn bộ sản phẩm</span>
                       </div>
                     </div>
                     <span className="modal-category-card__check">
@@ -627,6 +515,44 @@ export function ProductsPage() {
                   })}
                 </div>
               </div>
+              <div className="catalog-modal__section">
+                <label className="modal-section-label" htmlFor="catalog-modal-search">
+                  🔍 Tìm kiếm theo tên hoặc kích thước
+                </label>
+                <div className="modal-search-box">
+                  <span className="modal-search-box__icon">🔍</span>
+                  <input
+                    id="catalog-modal-search"
+                    type="text"
+                    className="modal-search-box__input"
+                    placeholder="Vd: 60x85, D40, đầu cột, phù điêu..."
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                  />
+                  {searchInput ? (
+                    <button
+                      type="button"
+                      className="modal-search-box__clear"
+                      onClick={() => {
+                        setSearchInput("");
+                        updateFilters({ ...filters, search: "" });
+                      }}
+                      aria-label="Xóa từ khóa"
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                </div>
+                {searchInput ? (
+                  <div className="modal-live-match-indicator" aria-live="polite">
+                    <span className="modal-live-match-text">
+                      {productsQuery.isFetching || searchInput !== filters.search
+                        ? "Đang tìm kiếm..."
+                        : `Tìm thấy ${totalItems} sản phẩm phù hợp`}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             {/* Footer */}
@@ -653,7 +579,7 @@ export function ProductsPage() {
                 className="modal-footer__apply-btn"
                 onClick={() => setFilterModalOpen(false)}
               >
-                Xem kết quả ({displayProducts.length} sản phẩm) →
+                Xem kết quả ({totalItems} sản phẩm) →
               </button>
             </div>
           </div>

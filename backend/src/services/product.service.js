@@ -122,12 +122,32 @@ const buildWhere = async (query = {}, publicOnly = false) => {
 export const getProducts = async (query = {}, publicOnly = false) => {
   const { page, limit, offset } = getPagination(query.page, query.limit || 9);
   const where = await buildWhere(query, publicOnly);
-  const [count, rows] = await Promise.all([
-    Product.countDocuments(where),
-    Product.find(where)
+  // Opt-in for the catalogue only. Rank all visible categories before pagination,
+  // otherwise a popular category can remain hidden until a later page loads.
+  let rowsQuery;
+  if (publicOnly && query.sort === "category-popularity" && !query.categoryId && !query.search && !query.featured) {
+    const rankedCategories = await Product.aggregate([
+      { $match: { isVisible: true } },
+      { $group: { _id: "$categoryId", count: { $sum: 1 } } },
+      { $sort: { count: -1, _id: 1 } }
+    ]);
+    rowsQuery = Product.aggregate([
+      { $match: where },
+      { $addFields: { categoryRank: { $indexOfArray: [rankedCategories.map(item => item._id), "$categoryId"] } } },
+      { $sort: { categoryRank: 1, sortOrder: 1, createdAt: -1, _id: 1 } },
+      { $skip: offset },
+      { $limit: limit },
+      { $unset: "categoryRank" }
+    ]).then(items => items.map(item => Product.hydrate(item)));
+  } else {
+    rowsQuery = Product.find(where)
       .sort({ sortOrder: 1, createdAt: -1 })
       .skip(offset)
-      .limit(limit)
+      .limit(limit);
+  }
+  const [count, rows] = await Promise.all([
+    Product.countDocuments(where),
+    rowsQuery
   ]);
   const items = await attachRelations(rows);
 
