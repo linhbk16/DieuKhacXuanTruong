@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { Art3DViewerModal } from "../common/Art3DViewerModal";
+import { useSiteSettings } from "../../hooks/useSiteData";
+import { getContactInfo } from "../../utils/contactInfo";
 
 const DEFAULT_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f7f1e7'/%3E%3Cpath d='M160 110 L240 110 L240 190 L160 190 Z' stroke='%23c59b27' stroke-width='2' fill='none'/%3E%3Ccircle cx='200' cy='150' r='20' fill='%23c59b27' opacity='0.3'/%3E%3Ctext x='200' y='220' font-family='serif' font-size='14' fill='%23786f5f' text-anchor='middle'%3EĐiêu Khắc Xuân Trường%3C/text%3E%3C/svg%3E";
@@ -9,6 +11,8 @@ const DEFAULT_PLACEHOLDER =
 export function ProductQuickViewModal({ product, open, onClose }) {
   const [activeImgIndex, setActiveImgIndex] = useState(0);
   const [show3DModal, setShow3DModal] = useState(false);
+  const { data: settings } = useSiteSettings();
+  const contact = getContactInfo(settings);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -146,20 +150,24 @@ export function ProductQuickViewModal({ product, open, onClose }) {
               </button>
 
               <div className="quickview-contact-group">
-                <a
-                  href="https://zalo.me/0909888668"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="quickview-contact-btn zalo"
-                >
-                  💬 Nhắn Zalo tư vấn
-                </a>
-                <a
-                  href="tel:0909888668"
-                  className="quickview-contact-btn hotline"
-                >
-                  📞 Gọi Hotline báo giá
-                </a>
+                {contact.zaloUrl ? (
+                  <a
+                    href={contact.zaloUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="quickview-contact-btn zalo"
+                  >
+                    💬 Nhắn Zalo tư vấn
+                  </a>
+                ) : null}
+                {contact.telHref ? (
+                  <a
+                    href={contact.telHref}
+                    className="quickview-contact-btn hotline"
+                  >
+                    📞 Gọi Hotline báo giá
+                  </a>
+                ) : null}
               </div>
 
               <Link

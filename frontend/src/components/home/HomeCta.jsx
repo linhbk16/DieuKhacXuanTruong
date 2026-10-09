@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
+import { useSiteSettings } from "../../hooks/useSiteData";
+import { getContactInfo } from "../../utils/contactInfo";
 
 export function HomeCta({ cta = {} }) {
+  const { data: settings } = useSiteSettings();
+  const { hotline, telHref, zaloUrl } = getContactInfo(settings);
   const notes = [
     "Tư vấn mẫu và bố cục hoa văn theo bản vẽ kiến trúc",
     "Đội ngũ nghệ nhân thi công trực tiếp tại công trình",
@@ -27,22 +31,26 @@ export function HomeCta({ cta = {} }) {
           </div>
 
           <div className="cta-panel-luxury__actions">
-            <a
-              href="https://zalo.me/0909888668"
-              target="_blank"
-              rel="noreferrer"
-              className="button button--primary-gold-full"
-              style={{ maxWidth: "260px" }}
-            >
-              💬 Chat Zalo 0909 888 668
-            </a>
-            <a
-              href="tel:0909888668"
-              className="button button--ghost"
-              style={{ borderColor: "#c59b27", color: "#e8d5a7" }}
-            >
-              📞 Gọi tư vấn
-            </a>
+            {zaloUrl ? (
+              <a
+                href={zaloUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="button button--primary-gold-full"
+                style={{ maxWidth: "260px" }}
+              >
+                💬 Chat Zalo {hotline}
+              </a>
+            ) : null}
+            {telHref ? (
+              <a
+                href={telHref}
+                className="button button--ghost"
+                style={{ borderColor: "#c59b27", color: "#e8d5a7" }}
+              >
+                📞 Gọi tư vấn
+              </a>
+            ) : null}
             <Link className="button button--ghost" to="/lien-he">
               ✉️ Gửi yêu cầu báo giá
             </Link>

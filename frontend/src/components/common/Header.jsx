@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink } from "react-router-dom";
 import { HeaderSearchModal } from "./HeaderSearchModal";
+import { getContactInfo } from "../../utils/contactInfo";
 
 const navItems = [
   { to: "/", label: "Trang chủ" },
@@ -14,6 +15,7 @@ export function Header({ settings = {} }) {
   const [open, setOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const headerRef = useRef(null);
+  const contact = getContactInfo(settings);
 
   useEffect(() => {
     const closeMenu = () => setOpen(false);
@@ -84,9 +86,11 @@ export function Header({ settings = {} }) {
             <span>🔍</span> Tìm sản phẩm...
           </button>
 
-          <a className="button button--primary site-nav__cta" href={`tel:${settings.hotline || "0909888668"}`}>
-            📞 {settings.hotline || "0909 888 668"}
-          </a>
+          {contact.telHref ? (
+            <a className="button button--primary site-nav__cta" href={contact.telHref}>
+              📞 {contact.hotline}
+            </a>
+          ) : null}
         </nav>
 
         {/* Mobile Header Actions - Single Search Button + Toggle */}

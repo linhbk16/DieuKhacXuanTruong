@@ -68,9 +68,6 @@
   .floating-page-slot:empty { display: none; }
   .site-footer__bottom-links { flex-wrap: wrap; }
   .site-footer__bottom-links a, .footer-links a { display: inline-flex; align-items: center; min-height: 44px; }
-  .image-lightbox__dialog { height: 96dvh !important; max-height: 96dvh !important; }
-  .image-lightbox__toolbar, .image-lightbox__toolbar-group { flex-wrap: wrap !important; }
-  .image-lightbox__button { min-height: 44px !important; }
 }
 
 @media (max-width: 480px) {

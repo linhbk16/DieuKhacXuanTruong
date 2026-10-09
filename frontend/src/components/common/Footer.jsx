@@ -1,6 +1,9 @@
 import { Link } from "react-router-dom";
+import { getContactInfo } from "../../utils/contactInfo";
 
 export function Footer({ settings = {}, categories = [] }) {
+  const contact = getContactInfo(settings);
+
   return (
     <footer className="site-footer">
       <div className="container site-footer__grid">
@@ -25,7 +28,7 @@ export function Footer({ settings = {}, categories = [] }) {
         <div>
           <span className="footer-label">Liên hệ</span>
           <div className="footer-links">
-            <a href={`tel:${settings.hotline || ""}`}>{settings.hotline || "0909 888 668"}</a>
+            {contact.telHref ? <a href={contact.telHref}>{contact.hotline}</a> : null}
             <a href={`mailto:${settings.email || ""}`}>{settings.email || "hello@dieu-khac.vn"}</a>
             <span>{settings.address || "TP. Ho Chi Minh"}</span>
           </div>

@@ -5,12 +5,13 @@ const DEFAULT_PLACEHOLDER =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300' viewBox='0 0 400 300'%3E%3Crect width='400' height='300' fill='%23f7f1e7'/%3E%3Cpath d='M160 110 L240 110 L240 190 L160 190 Z' stroke='%23c59b27' stroke-width='2' fill='none'/%3E%3Ccircle cx='200' cy='150' r='20' fill='%23c59b27' opacity='0.3'/%3E%3Ctext x='200' y='220' font-family='serif' font-size='14' fill='%23786f5f' text-anchor='middle'%3EĐiêu Khắc Xuân Trường%3C/text%3E%3C/svg%3E";
 
 const MIN_ZOOM = 1;
-const MAX_ZOOM = 4.5;
-const ZOOM_STEP = 0.5;
+const MAX_ZOOM = 5;
+const DOUBLE_TAP_ZOOM = 2.5;
+const RESET_VIEW = { scale: MIN_ZOOM, x: 0, y: 0 };
 
-const clampZoom = (value) =>
-  Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value.toFixed(2))));
+const clampScale = (value) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
 
+// Minimal photo viewer: pinch / wheel to zoom, drag to pan, tap outside or X to close.
 export function ImageLightbox({
   images = [],
   activeIndex = 0,
@@ -19,438 +20,266 @@ export function ImageLightbox({
   onSelect,
   title,
 }) {
-  const [zoom, setZoom] = useState(MIN_ZOOM);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [view, setView] = useState(RESET_VIEW);
   const [isInteracting, setIsInteracting] = useState(false);
 
-  const overlayRef = useRef(null);
-  const containerRef = useRef(null);
-  const touchStateRef = useRef({
-    type: null,
-    distance: 0,
-    startScale: 1,
-    startX: 0,
-    startY: 0,
-    panX: 0,
-    panY: 0,
-    lastTap: 0,
-  });
+  const stageRef = useRef(null);
+  const imageRef = useRef(null);
+  const viewRef = useRef(view);
+  const gestureRef = useRef({ type: null, lastTap: 0, moved: false });
 
-  const mouseStateRef = useRef({
-    isDragging: false,
-    startX: 0,
-    startY: 0,
-    panX: 0,
-    panY: 0,
-  });
+  viewRef.current = view;
 
   const activeImage = useMemo(
     () => images[activeIndex] || images[0] || null,
     [activeIndex, images],
   );
 
-  // Keyboard navigation & strict scroll lock on both body & documentElement
+  // Keep the image inside the stage when zoomed; centered at 1x.
+  const clampView = (next) => {
+    const stage = stageRef.current;
+    const image = imageRef.current;
+    if (!stage || !image || next.scale <= MIN_ZOOM + 0.01) return RESET_VIEW;
+    const maxX = Math.max(0, (image.offsetWidth * next.scale - stage.clientWidth) / 2);
+    const maxY = Math.max(0, (image.offsetHeight * next.scale - stage.clientHeight) / 2);
+    return {
+      scale: next.scale,
+      x: Math.min(maxX, Math.max(-maxX, next.x)),
+      y: Math.min(maxY, Math.max(-maxY, next.y)),
+    };
+  };
+
+  // Zoom keeping the point under (clientX, clientY) fixed on screen.
+  const zoomAt = (targetScale, clientX, clientY, base = viewRef.current) => {
+    const stage = stageRef.current;
+    if (!stage) return;
+    const rect = stage.getBoundingClientRect();
+    const cx = clientX - rect.left - rect.width / 2;
+    const cy = clientY - rect.top - rect.height / 2;
+    const scale = clampScale(targetScale);
+    const ratio = scale / base.scale;
+    setView(clampView({ scale, x: cx - ratio * (cx - base.x), y: cy - ratio * (cy - base.y) }));
+  };
+
+  // Scroll lock + keyboard (Esc to close, arrows to switch photo)
   useEffect(() => {
     if (!open) return undefined;
 
     const prevBodyOverflow = document.body.style.overflow;
     const prevHtmlOverflow = document.documentElement.style.overflow;
-    const prevBodyOverscroll = document.body.style.overscrollBehavior;
-    const prevHtmlOverscroll = document.documentElement.style.overscrollBehavior;
-
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
-    document.body.style.overscrollBehavior = "none";
-    document.documentElement.style.overscrollBehavior = "none";
 
     const handleKeyDown = (event) => {
-      if (event.key === "Escape") {
-        onClose?.();
-        return;
-      }
-
-      if (event.key === "ArrowRight" && images.length > 1) {
-        onSelect?.((activeIndex + 1) % images.length);
-        return;
-      }
-
-      if (event.key === "ArrowLeft" && images.length > 1) {
-        onSelect?.((activeIndex - 1 + images.length) % images.length);
-        return;
-      }
-
-      if (event.key === "+" || event.key === "=") {
-        setZoom((current) => clampZoom(current + ZOOM_STEP));
-      }
-
-      if (event.key === "-") {
-        setZoom((current) => {
-          const next = clampZoom(current - ZOOM_STEP);
-          if (next <= 1.05) setPan({ x: 0, y: 0 });
-          return next;
-        });
-      }
-
-      if (event.key === "0") {
-        setZoom(MIN_ZOOM);
-        setPan({ x: 0, y: 0 });
-      }
+      if (event.key === "Escape") onClose?.();
+      if (images.length > 1 && event.key === "ArrowRight") onSelect?.((activeIndex + 1) % images.length);
+      if (images.length > 1 && event.key === "ArrowLeft") onSelect?.((activeIndex - 1 + images.length) % images.length);
     };
-
     window.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.body.style.overflow = prevBodyOverflow;
       document.documentElement.style.overflow = prevHtmlOverflow;
-      document.body.style.overscrollBehavior = prevBodyOverscroll;
-      document.documentElement.style.overscrollBehavior = prevHtmlOverscroll;
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [activeIndex, images.length, onClose, onSelect, open]);
 
-  // Native non-passive wheel listener on overlay: completely blocks outer page scrolling
+  // Native non-passive listeners so wheel / touch never scroll the page behind.
   useEffect(() => {
     if (!open) return undefined;
-    const overlay = overlayRef.current;
-    if (!overlay) return undefined;
-
-    const handleNativeWheel = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
-      setZoom((current) => {
-        const next = clampZoom(current + delta);
-        if (next <= 1.05) setPan({ x: 0, y: 0 });
-        return next;
-      });
-    };
-
-    overlay.addEventListener("wheel", handleNativeWheel, { passive: false });
-
-    return () => {
-      overlay.removeEventListener("wheel", handleNativeWheel);
-    };
-  }, [open]);
-
-  // Native non-passive touch listener to prevent touch scroll leakage
-  useEffect(() => {
-    if (!open) return undefined;
-    const stage = containerRef.current;
+    const stage = stageRef.current;
     if (!stage) return undefined;
 
-    const handleNativeTouchMove = (e) => {
-      if (e.cancelable) {
-        e.preventDefault();
-      }
+    const handleWheel = (e) => {
+      e.preventDefault();
+      const current = viewRef.current;
+      zoomAt(current.scale * Math.exp(-e.deltaY * 0.0018), e.clientX, e.clientY, current);
+    };
+    const handleTouchMove = (e) => {
+      if (e.cancelable) e.preventDefault();
     };
 
-    stage.addEventListener("touchmove", handleNativeTouchMove, { passive: false });
-
+    stage.addEventListener("wheel", handleWheel, { passive: false });
+    stage.addEventListener("touchmove", handleTouchMove, { passive: false });
     return () => {
-      stage.removeEventListener("touchmove", handleNativeTouchMove);
+      stage.removeEventListener("wheel", handleWheel);
+      stage.removeEventListener("touchmove", handleTouchMove);
     };
-  }, [open]);
+  }, [open, activeImage]);
 
-  // Reset zoom & pan when image changes or opens
   useEffect(() => {
-    if (open) {
-      setZoom(MIN_ZOOM);
-      setPan({ x: 0, y: 0 });
-    }
+    if (open) setView(RESET_VIEW);
   }, [activeIndex, open]);
 
   if (!open || !activeImage || typeof document === "undefined") {
     return null;
   }
 
-  // --- Touch Gestures (Pinch to Zoom & Drag to Pan) ---
-  const getTouchDistance = (touches) =>
-    Math.hypot(
-      touches[0].clientX - touches[1].clientX,
-      touches[0].clientY - touches[1].clientY,
-    );
+  const toggleZoomAt = (clientX, clientY) => {
+    if (viewRef.current.scale > MIN_ZOOM + 0.2) setView(RESET_VIEW);
+    else zoomAt(DOUBLE_TAP_ZOOM, clientX, clientY);
+  };
+
+  // --- Touch: pinch to zoom, drag to pan, double tap, swipe to switch photo ---
+  const getDistance = (touches) =>
+    Math.hypot(touches[0].clientX - touches[1].clientX, touches[0].clientY - touches[1].clientY);
 
   const handleTouchStart = (e) => {
-    const container = containerRef.current;
-    if (!container) return;
+    const g = gestureRef.current;
+    g.moved = false;
+    g.lastTouchAt = Date.now();
 
     if (e.touches.length === 2) {
-      touchStateRef.current.type = "pinch";
-      touchStateRef.current.distance = getTouchDistance(e.touches);
-      touchStateRef.current.startScale = zoom;
+      g.type = "pinch";
+      g.distance = getDistance(e.touches);
+      g.base = viewRef.current;
       setIsInteracting(true);
-    } else if (e.touches.length === 1) {
-      const now = Date.now();
-      const lastTap = touchStateRef.current.lastTap;
+      return;
+    }
 
-      // Double tap to zoom
-      if (now - lastTap < 300) {
-        e.preventDefault();
-        if (zoom > 1.2) {
-          setZoom(MIN_ZOOM);
-          setPan({ x: 0, y: 0 });
-        } else {
-          const rect = container.getBoundingClientRect();
-          const tapX = e.touches[0].clientX - rect.left - rect.width / 2;
-          const tapY = e.touches[0].clientY - rect.top - rect.height / 2;
-          setZoom(2.5);
-          setPan({ x: -tapX * 0.75, y: -tapY * 0.75 });
-        }
-        touchStateRef.current.lastTap = 0;
+    if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const now = Date.now();
+      if (now - g.lastTap < 300) {
+        g.lastTap = 0;
+        g.type = "doubletap";
+        toggleZoomAt(touch.clientX, touch.clientY);
         return;
       }
-      touchStateRef.current.lastTap = now;
-
-      touchStateRef.current.type = "pan";
-      touchStateRef.current.startX = e.touches[0].clientX;
-      touchStateRef.current.startY = e.touches[0].clientY;
-      touchStateRef.current.panX = pan.x;
-      touchStateRef.current.panY = pan.y;
+      g.lastTap = now;
+      g.type = "pan";
+      g.startX = touch.clientX;
+      g.startY = touch.clientY;
+      g.base = viewRef.current;
       setIsInteracting(true);
     }
   };
 
   const handleTouchMove = (e) => {
-    const container = containerRef.current;
-    if (!container) return;
+    const g = gestureRef.current;
 
-    if (e.cancelable) {
-      e.preventDefault();
+    if (g.type === "pinch" && e.touches.length === 2) {
+      g.moved = true;
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      zoomAt(g.base.scale * (getDistance(e.touches) / (g.distance || 1)), midX, midY, g.base);
+      return;
     }
 
-    if (touchStateRef.current.type === "pinch" && e.touches.length === 2) {
-      const currentDist = getTouchDistance(e.touches);
-      const ratio = currentDist / (touchStateRef.current.distance || 1);
-      const nextZoom = clampZoom(touchStateRef.current.startScale * ratio);
-      setZoom(nextZoom);
-      if (nextZoom <= 1.05) {
-        setPan({ x: 0, y: 0 });
+    if (g.type === "pan" && e.touches.length === 1) {
+      const dx = e.touches[0].clientX - g.startX;
+      const dy = e.touches[0].clientY - g.startY;
+      if (Math.abs(dx) > 6 || Math.abs(dy) > 6) g.moved = true;
+      if (g.base.scale > MIN_ZOOM) {
+        setView(clampView({ scale: g.base.scale, x: g.base.x + dx, y: g.base.y + dy }));
       }
-    } else if (touchStateRef.current.type === "pan" && e.touches.length === 1 && zoom > 1) {
-      const deltaX = e.touches[0].clientX - touchStateRef.current.startX;
-      const deltaY = e.touches[0].clientY - touchStateRef.current.startY;
-
-      const maxPanX = (container.clientWidth * (zoom - 1)) / 2 + 80;
-      const maxPanY = (container.clientHeight * (zoom - 1)) / 2 + 80;
-
-      const targetX = touchStateRef.current.panX + deltaX;
-      const targetY = touchStateRef.current.panY + deltaY;
-
-      setPan({
-        x: Math.min(maxPanX, Math.max(-maxPanX, targetX)),
-        y: Math.min(maxPanY, Math.max(-maxPanY, targetY)),
-      });
     }
   };
 
   const handleTouchEnd = (e) => {
-    // If was at 1x and swiped horizontally across > 50px, switch photo
-    if (touchStateRef.current.type === "pan" && zoom <= 1.05 && images.length > 1 && e.changedTouches?.length) {
-      const swipeDeltaX = e.changedTouches[0].clientX - touchStateRef.current.startX;
-      if (swipeDeltaX < -50) {
-        onSelect?.((activeIndex + 1) % images.length);
-      } else if (swipeDeltaX > 50) {
-        onSelect?.((activeIndex - 1 + images.length) % images.length);
-      }
+    const g = gestureRef.current;
+
+    // At 1x a horizontal swipe switches photo.
+    if (g.type === "pan" && g.base?.scale <= MIN_ZOOM && images.length > 1 && e.changedTouches?.length) {
+      const dx = e.changedTouches[0].clientX - g.startX;
+      if (dx < -50) onSelect?.((activeIndex + 1) % images.length);
+      else if (dx > 50) onSelect?.((activeIndex - 1 + images.length) % images.length);
     }
 
-    setIsInteracting(false);
-    touchStateRef.current.type = null;
-    if (zoom <= 1.05) {
-      setZoom(MIN_ZOOM);
-      setPan({ x: 0, y: 0 });
+    if (e.touches.length === 0) {
+      g.type = null;
+      setIsInteracting(false);
     }
   };
 
+  // --- Mouse: drag to pan when zoomed, double click to toggle zoom ---
   const handleMouseDown = (e) => {
-    if (e.button !== 0 || zoom <= 1) return;
-    mouseStateRef.current = {
-      isDragging: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      panX: pan.x,
-      panY: pan.y,
-    };
+    const g = gestureRef.current;
+    g.moved = false;
+    if (e.button !== 0 || viewRef.current.scale <= MIN_ZOOM) return;
+    g.type = "mouse";
+    g.startX = e.clientX;
+    g.startY = e.clientY;
+    g.base = viewRef.current;
     setIsInteracting(true);
   };
 
   const handleMouseMove = (e) => {
-    if (!mouseStateRef.current.isDragging || zoom <= 1) return;
-    const container = containerRef.current;
-    if (!container) return;
-
-    const deltaX = e.clientX - mouseStateRef.current.startX;
-    const deltaY = e.clientY - mouseStateRef.current.startY;
-
-    const maxPanX = (container.clientWidth * (zoom - 1)) / 2 + 80;
-    const maxPanY = (container.clientHeight * (zoom - 1)) / 2 + 80;
-
-    const targetX = mouseStateRef.current.panX + deltaX;
-    const targetY = mouseStateRef.current.panY + deltaY;
-
-    setPan({
-      x: Math.min(maxPanX, Math.max(-maxPanX, targetX)),
-      y: Math.min(maxPanY, Math.max(-maxPanY, targetY)),
-    });
+    const g = gestureRef.current;
+    if (g.type !== "mouse") return;
+    const dx = e.clientX - g.startX;
+    const dy = e.clientY - g.startY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) g.moved = true;
+    setView(clampView({ scale: g.base.scale, x: g.base.x + dx, y: g.base.y + dy }));
   };
 
   const handleMouseUp = () => {
-    mouseStateRef.current.isDragging = false;
+    if (gestureRef.current.type === "mouse") gestureRef.current.type = null;
     setIsInteracting(false);
   };
 
-  const handleDoubleClick = (e) => {
-    const container = containerRef.current;
-    if (!container) return;
-    if (zoom > 1.2) {
-      setZoom(MIN_ZOOM);
-      setPan({ x: 0, y: 0 });
-    } else {
-      const rect = container.getBoundingClientRect();
-      const tapX = e.clientX - rect.left - rect.width / 2;
-      const tapY = e.clientY - rect.top - rect.height / 2;
-      setZoom(2.5);
-      setPan({ x: -tapX * 0.75, y: -tapY * 0.75 });
-    }
+  // Tap / click on the empty area around the photo closes the viewer.
+  const handleStageClick = (e) => {
+    if (gestureRef.current.moved) return;
+    if (e.target !== imageRef.current) onClose?.();
   };
 
+  const isZoomed = view.scale > MIN_ZOOM;
+
   return createPortal(
-    <div
-      ref={overlayRef}
-      className="image-lightbox"
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onClick={onClose}
-    >
+    <div className="photo-viewer" role="dialog" aria-modal="true" aria-label={title}>
       <div
-        className="image-lightbox__dialog"
-        onClick={(event) => event.stopPropagation()}
+        ref={stageRef}
+        className="photo-viewer__stage"
+        onClick={handleStageClick}
+        onDoubleClick={(e) => {
+          // Touch double tap is handled in handleTouchStart; ignore the emulated dblclick.
+          if (Date.now() - (gestureRef.current.lastTouchAt || 0) < 800) return;
+          if (e.target === imageRef.current) toggleZoomAt(e.clientX, e.clientY);
+        }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
       >
-        <div className="image-lightbox__toolbar">
-          <div className="image-lightbox__toolbar-group">
-            {images.length > 1 ? (
-              <>
-                <button
-                  type="button"
-                  className="image-lightbox__button"
-                  onClick={() =>
-                    onSelect?.(
-                      (activeIndex - 1 + images.length) % images.length,
-                    )
-                  }
-                  title="Ảnh trước (Phím mũi tên trái)"
-                >
-                  ← Trước
-                </button>
-                <button
-                  type="button"
-                  className="image-lightbox__button"
-                  onClick={() => onSelect?.((activeIndex + 1) % images.length)}
-                  title="Ảnh sau (Phím mũi tên phải)"
-                >
-                  Sau →
-                </button>
-              </>
-            ) : null}
-          </div>
-
-          <div className="image-lightbox__toolbar-group">
-            <button
-              type="button"
-              className="image-lightbox__button"
-              onClick={() =>
-                setZoom((current) => {
-                  const next = clampZoom(current - ZOOM_STEP);
-                  if (next <= 1.05) setPan({ x: 0, y: 0 });
-                  return next;
-                })
-              }
-              disabled={zoom <= MIN_ZOOM}
-              title="Thu nhỏ (-)"
-            >
-              ➖ Thu nhỏ
-            </button>
-            <button
-              type="button"
-              className="image-lightbox__button"
-              onClick={() => {
-                setZoom(MIN_ZOOM);
-                setPan({ x: 0, y: 0 });
-              }}
-              disabled={zoom === MIN_ZOOM}
-              title="Vừa khung"
-            >
-              ↺ Vừa khung
-            </button>
-            <button
-              type="button"
-              className="image-lightbox__button image-lightbox__button--primary"
-              onClick={() =>
-                setZoom((current) => clampZoom(current + ZOOM_STEP))
-              }
-              disabled={zoom >= MAX_ZOOM}
-              title="Phóng to (+)"
-            >
-              ➕ Phóng to
-            </button>
-            <button
-              type="button"
-              className="image-lightbox__button image-lightbox__button--close"
-              onClick={onClose}
-              title="Đóng (Esc)"
-            >
-              ✕ Đóng
-            </button>
-          </div>
-        </div>
-
-        <div
-          ref={containerRef}
-          className="image-lightbox__stage"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onDoubleClick={handleDoubleClick}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-          onTouchCancel={handleTouchEnd}
-          style={{ touchAction: "none" }}
-        >
-          <img
-            src={activeImage.url || DEFAULT_PLACEHOLDER}
-            alt={activeImage.altText || title}
-            style={{
-              transform: `translate3d(${pan.x}px, ${pan.y}px, 0px) scale(${zoom})`,
-              transition: isInteracting ? "none" : "transform 0.22s cubic-bezier(0.16, 1, 0.3, 1)",
-              cursor: zoom > 1 ? (isInteracting ? "grabbing" : "grab") : "zoom-in",
-              userSelect: "none",
-              WebkitUserSelect: "none",
-            }}
-            draggable={false}
-            loading="eager"
-            decoding="async"
-            onError={(e) => {
-              e.currentTarget.src = DEFAULT_PLACEHOLDER;
-            }}
-          />
-
-          <div className="art-3d-hint zoom-interactive-hint">
-            <span className="hint-desktop">💡 Cuộn chuột để phóng to • Kéo để di chuyển ảnh</span>
-            <span className="hint-mobile">📱 Chụm hoặc mở hai ngón tay để thu phóng • Kéo để di chuyển ảnh</span>
-          </div>
-        </div>
-
-        <div className="image-lightbox__footer">
-          <p>{activeImage.altText || title}</p>
-          <span>
-            {activeIndex + 1}/{images.length} • {Math.round(zoom * 100)}%
-          </span>
-        </div>
+        <img
+          ref={imageRef}
+          src={activeImage.url || DEFAULT_PLACEHOLDER}
+          alt={activeImage.altText || title}
+          style={{
+            transform: `translate3d(${view.x}px, ${view.y}px, 0) scale(${view.scale})`,
+            transition: isInteracting ? "none" : "transform 0.2s ease-out",
+            cursor: isZoomed ? (isInteracting ? "grabbing" : "grab") : "zoom-in",
+          }}
+          draggable={false}
+          decoding="async"
+          onError={(e) => {
+            e.currentTarget.src = DEFAULT_PLACEHOLDER;
+          }}
+        />
       </div>
+
+      {images.length > 1 ? (
+        <span className="photo-viewer__counter">
+          {activeIndex + 1}/{images.length}
+        </span>
+      ) : null}
+
+      <button
+        type="button"
+        className="photo-viewer__close"
+        onClick={onClose}
+        aria-label="Đóng xem ảnh"
+        title="Đóng (Esc)"
+      >
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      </button>
     </div>,
     document.body,
   );

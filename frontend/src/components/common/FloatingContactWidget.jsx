@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { getContactInfo } from "../../utils/contactInfo";
 
 export function FloatingContactWidget({ settings = {} }) {
   const [showScrollTop, setShowScrollTop] = useState(false);
-  const phone = settings.hotline || "0912209186";
-  const formattedPhone = settings.hotline || "091 220 91 86";
-  const zaloUrl = settings.zaloUrl || `https://zalo.me/${phone.replace(/\D/g, "")}`;
+  const { hotline: formattedPhone, telHref, zaloUrl } = getContactInfo(settings);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,34 +37,38 @@ export function FloatingContactWidget({ settings = {} }) {
       <div id="floating-page-slot" className="floating-page-slot" />
 
       {/* Direct Call Button */}
-      <a
-        href={`tel:${phone}`}
-        className="floating-btn floating-btn--phone"
-        title={`Gọi điện tư vấn trực tiếp: ${formattedPhone}`}
-        aria-label={`Gọi tư vấn: ${formattedPhone}`}
-      >
-        <span className="floating-btn__icon">📞</span>
-        <span className="floating-btn__label">
-          <small>TƯ VẤN MIỄN PHÍ</small>
-          <strong>{formattedPhone}</strong>
-        </span>
-      </a>
+      {telHref ? (
+        <a
+          href={telHref}
+          className="floating-btn floating-btn--phone"
+          title={`Gọi điện tư vấn trực tiếp: ${formattedPhone}`}
+          aria-label={`Gọi tư vấn: ${formattedPhone}`}
+        >
+          <span className="floating-btn__icon">📞</span>
+          <span className="floating-btn__label">
+            <small>TƯ VẤN MIỄN PHÍ</small>
+            <strong>{formattedPhone}</strong>
+          </span>
+        </a>
+      ) : null}
 
       {/* Zalo Chat Button */}
-      <a
-        href={zaloUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="floating-btn floating-btn--zalo"
-        title="Nhắn tin tư vấn qua Zalo"
-        aria-label="Chat tư vấn qua Zalo"
-      >
-        <span className="floating-btn__icon">💬</span>
-        <span className="floating-btn__label">
-          <small>CHAT TƯ VẤN</small>
-          <strong>Nhắn tin qua Zalo</strong>
-        </span>
-      </a>
+      {zaloUrl ? (
+        <a
+          href={zaloUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="floating-btn floating-btn--zalo"
+          title="Nhắn tin tư vấn qua Zalo"
+          aria-label="Chat tư vấn qua Zalo"
+        >
+          <span className="floating-btn__icon">💬</span>
+          <span className="floating-btn__label">
+            <small>CHAT TƯ VẤN</small>
+            <strong>Nhắn tin qua Zalo</strong>
+          </span>
+        </a>
+      ) : null}
     </aside>
   );
 }

@@ -1450,96 +1450,67 @@ p {
   padding: 8px;
 }
 
-.image-lightbox {
+.photo-viewer {
   position: fixed;
   inset: 0;
   z-index: 1000000;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgba(19, 14, 9, 0.88);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: rgba(10, 8, 6, 0.97);
   overscroll-behavior: contain;
   touch-action: none;
+  animation: fadeIn 0.2s ease-out;
 }
 
-.image-lightbox__dialog {
-  width: min(1120px, 100%);
-  display: grid;
-  gap: 14px;
-  overscroll-behavior: contain;
-}
-
-.image-lightbox__toolbar,
-.image-lightbox__footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.image-lightbox__toolbar-group {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.image-lightbox__button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 10px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.08);
-  color: #fffaf4;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.image-lightbox__button:disabled {
-  cursor: not-allowed;
-  opacity: 0.44;
-}
-
-.image-lightbox__button--primary {
-  background: linear-gradient(135deg, var(--gold), #d4b26e);
-  color: #fff;
-  border-color: transparent;
-}
-
-.image-lightbox__stage {
-  position: relative;
+.photo-viewer__stage {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: min(74vh, 760px);
-  padding: 24px;
-  border-radius: 28px;
+  padding: 64px 24px 24px;
   overflow: hidden;
   touch-action: none;
-  overscroll-behavior: contain;
-  background:
-    radial-gradient(circle at top left, rgba(183, 139, 63, 0.14), transparent 28%),
-    rgba(18, 15, 12, 0.98);
 }
 
-.image-lightbox__stage img {
-  max-width: 95%;
-  max-height: 68vh;
+.photo-viewer__stage img {
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   will-change: transform;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
-.image-lightbox__footer p,
-.image-lightbox__footer span {
-  color: rgba(255, 250, 244, 0.9);
+.photo-viewer__close {
+  position: absolute;
+  top: max(14px, env(safe-area-inset-top));
+  right: max(14px, env(safe-area-inset-right));
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.photo-viewer__close:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.photo-viewer__counter {
+  position: absolute;
+  top: max(24px, env(safe-area-inset-top));
+  left: max(18px, env(safe-area-inset-left));
+  z-index: 2;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.9rem;
+  pointer-events: none;
 }
 
 .detail-content {
@@ -2142,43 +2113,6 @@ p {
     padding-top: 20px;
     padding-right: 0;
     padding-bottom: 132px;
-  }
-
-  .image-lightbox {
-    padding: 12px;
-  }
-
-  .image-lightbox__dialog {
-    gap: 10px;
-  }
-
-  .image-lightbox__toolbar,
-  .image-lightbox__footer,
-  .image-lightbox__toolbar-group {
-    width: 100%;
-  }
-
-  .image-lightbox__toolbar-group {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .image-lightbox__button {
-    width: 100%;
-    min-height: 42px;
-    padding: 10px 12px;
-    border-radius: 14px;
-    font-size: 0.88rem;
-  }
-
-  .image-lightbox__stage {
-    min-height: 52vh;
-    padding: 14px;
-    border-radius: 22px;
-  }
-
-  .image-lightbox__stage img {
-    max-height: 52vh;
   }
 
   .detail-gallery__zoom-chip {
@@ -6002,71 +5936,6 @@ a.contact-detail-item:hover {
    ========================================================================== */
 
 @media (max-width: 768px) {
-  /* 1. Image Lightbox Mobile UX */
-  .image-lightbox {
-    padding: 8px 6px !important;
-  }
-  .image-lightbox__dialog {
-    width: 100% !important;
-    height: 96vh !important;
-    max-height: 96vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: space-between !important;
-    gap: 6px !important;
-  }
-  .image-lightbox__toolbar {
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    gap: 4px !important;
-    flex-wrap: nowrap !important;
-    width: 100% !important;
-  }
-  .image-lightbox__toolbar-group {
-    display: flex !important;
-    align-items: center !important;
-    gap: 4px !important;
-    flex-wrap: nowrap !important;
-  }
-  .image-lightbox__button {
-    min-height: 36px !important;
-    padding: 6px 9px !important;
-    font-size: 0.76rem !important;
-    border-radius: 10px !important;
-    white-space: nowrap !important;
-  }
-  .image-lightbox__button--close {
-    padding: 6px 10px !important;
-    background: rgba(220, 38, 38, 0.2) !important;
-    border-color: rgba(220, 38, 38, 0.4) !important;
-  }
-  .image-lightbox__stage {
-    flex: 1 !important;
-    min-height: 0 !important;
-    padding: 6px !important;
-    border-radius: 18px !important;
-  }
-  .image-lightbox__stage img {
-    max-height: 76vh !important;
-    max-width: 98% !important;
-  }
-  .image-lightbox__footer {
-    padding: 4px 6px !important;
-    font-size: 0.78rem !important;
-  }
-  .image-lightbox__footer p {
-    max-width: 65% !important;
-    font-size: 0.82rem !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-  .image-lightbox__footer span {
-    font-size: 0.75rem !important;
-    white-space: nowrap !important;
-  }
-
   /* 2. Art 3D Viewer / Detail Zoom Modal Mobile UX */
   .art-3d-modal-overlay {
     padding: 8px !important;

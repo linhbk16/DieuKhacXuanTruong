@@ -3,6 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { publicApi } from "../api/publicApi";
 import { Seo } from "../components/common/Seo";
 import { useSiteSettings } from "../hooks/useSiteData";
+import { getContactInfo } from "../utils/contactInfo";
 
 const initialForm = {
   name: "",
@@ -17,10 +18,9 @@ export function ContactPage() {
   const [message, setMessage] = useState("");
   const settingsQuery = useSiteSettings();
   const settings = settingsQuery.data || {};
-  const hotline = settings.hotline || "091 220 91 86";
+  const { hotline, telHref, zaloUrl } = getContactInfo(settings);
   const email = settings.email || "hello@dieu-khac.vn";
   const address = settings.address || "Xóm 1, Xã Xuân Trường, Tỉnh Ninh Bình, Việt Nam";
-  const zaloUrl = settings.zaloUrl || "https://zalo.me/0912209186";
 
   const mutation = useMutation({
     mutationFn: publicApi.createContact,
@@ -58,17 +58,19 @@ export function ContactPage() {
 
             <div className="contact-info-cards">
               {/* Hotline */}
-              <a href={`tel:${hotline.replace(/\s+/g, "")}`} className="contact-detail-item">
-                <div className="contact-detail-item__icon">
-                  📞
-                </div>
-                <div className="contact-detail-item__content">
-                  <span className="contact-detail-item__label">Điện thoại tư vấn</span>
-                  <strong className="contact-detail-item__value contact-detail-item__value--highlight">
-                    {hotline}
-                  </strong>
-                </div>
-              </a>
+              {telHref ? (
+                <a href={telHref} className="contact-detail-item">
+                  <div className="contact-detail-item__icon">
+                    📞
+                  </div>
+                  <div className="contact-detail-item__content">
+                    <span className="contact-detail-item__label">Điện thoại tư vấn</span>
+                    <strong className="contact-detail-item__value contact-detail-item__value--highlight">
+                      {hotline}
+                    </strong>
+                  </div>
+                </a>
+              ) : null}
 
               {/* Zalo */}
               {zaloUrl ? (
