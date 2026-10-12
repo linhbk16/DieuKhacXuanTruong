@@ -50,9 +50,10 @@ const attachProductCounts = async (rows, publicOnly = false) => {
 };
 
 export const getCategories = async (query = {}, publicOnly = false) => {
-  if (publicOnly && query.limit === "all") {
-    const rows = await Category.find(buildCategoryWhere(query, true)).sort({ sortOrder: 1, createdAt: -1 });
-    const items = await attachProductCounts(rows, true);
+  // Dropdowns and totals need every category, not just the first page.
+  if (query.limit === "all") {
+    const rows = await Category.find(buildCategoryWhere(query, publicOnly)).sort({ sortOrder: 1, createdAt: -1 });
+    const items = await attachProductCounts(rows, publicOnly);
     return { items };
   }
 

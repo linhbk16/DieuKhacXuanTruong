@@ -46,25 +46,34 @@ export function ProductsPage() {
   const urlCategoryId = searchParams.get("categoryId") || "";
   const [selectedCategory, setSelectedCategory] = useState(urlCategoryId);
   const [searchKeyword, setSearchKeyword] = useState("");
+  const [tablePage, setTablePage] = useState({ current: 1, pageSize: 20 });
 
   // Sync state if URL changes
   useEffect(() => {
     setSelectedCategory(urlCategoryId);
   }, [urlCategoryId]);
 
+  // Back to the first page whenever the filter changes.
+  useEffect(() => {
+    setTablePage((prev) => ({ ...prev, current: 1 }));
+  }, [selectedCategory, searchKeyword]);
+
   const categoriesQuery = useQuery({
     queryKey: ["admin-product-categories"],
-    queryFn: () => adminApi.getCategories({ type: "PRODUCT", limit: 100 })
+    queryFn: () => adminApi.getCategories({ type: "PRODUCT", limit: "all" })
   });
 
+  // Paginate on the server so every product is reachable, not just the first 100.
   const productsQuery = useQuery({
-    queryKey: ["admin-products", { categoryId: selectedCategory, search: searchKeyword }],
+    queryKey: ["admin-products", { categoryId: selectedCategory, search: searchKeyword, ...tablePage }],
     queryFn: () =>
       adminApi.getProducts({
         categoryId: selectedCategory || undefined,
         search: searchKeyword || undefined,
-        limit: 100
-      })
+        page: tablePage.current,
+        limit: tablePage.pageSize
+      }),
+    placeholderData: (previousData) => previousData
   });
 
   const saveMutation = useMutation({
@@ -244,9 +253,10 @@ export function ProductsPage() {
     },
     {
       title: "Tác vụ",
-      width: 200,
+      width: 240,
+      fixed: "right",
       render: (_, record) => (
-        <Space size={6}>
+        <Space size={6} wrap={false}>
           <Button size="small" onClick={() => openEdit(record)}>
             Sửa
           </Button>
@@ -303,7 +313,7 @@ export function ProductsPage() {
             }}
             options={[
               {
-                label: `✨ Tất cả danh mục (${categories.reduce((s, c) => s + (c.productCount || 0), 0) || products.length} tác phẩm)`,
+                label: `✨ Tất cả danh mục (${categories.reduce((s, c) => s + (c.productCount || 0), 0)} tác phẩm)`,
                 value: ""
               },
               ...categories.map((cat) => ({
@@ -334,7 +344,7 @@ export function ProductsPage() {
           )}
 
           <span style={{ color: "#777", fontSize: "13px", marginLeft: "auto" }}>
-            Hiển thị: <strong>{products.length}</strong> quy cách
+            Hiển thị: <strong>{productsQuery.data?.pagination?.totalItems ?? products.length}</strong> quy cách
           </span>
         </Space>
       </Card>
@@ -344,8 +354,16 @@ export function ProductsPage() {
         rowKey="id"
         dataSource={products}
         columns={columns}
-        loading={productsQuery.isLoading}
-        pagination={{ pageSize: 20, showSizeChanger: true }}
+        loading={productsQuery.isFetching}
+        scroll={{ x: 1180 }}
+        pagination={{
+          current: tablePage.current,
+          pageSize: tablePage.pageSize,
+          total: productsQuery.data?.pagination?.totalItems || 0,
+          showSizeChanger: true,
+          showTotal: (total) => `${total} sản phẩm`
+        }}
+        onChange={(pagination) => setTablePage({ current: pagination.current, pageSize: pagination.pageSize })}
       />
 
       <Drawer

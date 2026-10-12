@@ -29,7 +29,7 @@ export function CategoriesPage() {
 
   const categoriesQuery = useQuery({
     queryKey: ["admin-categories"],
-    queryFn: () => adminApi.getCategories({ limit: 100 })
+    queryFn: () => adminApi.getCategories({ limit: "all" })
   });
 
   const saveMutation = useMutation({

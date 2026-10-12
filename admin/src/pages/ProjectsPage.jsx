@@ -43,7 +43,7 @@ export function ProjectsPage() {
 
   const categoriesQuery = useQuery({
     queryKey: ["admin-project-categories"],
-    queryFn: () => adminApi.getCategories({ type: "PROJECT", limit: 100 })
+    queryFn: () => adminApi.getCategories({ type: "PROJECT", limit: "all" })
   });
 
   const saveMutation = useMutation({
