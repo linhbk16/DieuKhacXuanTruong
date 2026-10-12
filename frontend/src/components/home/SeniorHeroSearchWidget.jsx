@@ -1,10 +1,21 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useProductCategories } from "../../hooks/useSiteData";
 
-export function SeniorHeroSearchWidget({ categories = [] }) {
+export function SeniorHeroSearchWidget() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCat, setSelectedCat] = useState("");
   const navigate = useNavigate();
+  const categoriesQuery = useProductCategories();
+
+  // All product categories (not only featured ones), A-Z, skipping empty ones.
+  const categories = useMemo(
+    () =>
+      (categoriesQuery.data?.items || [])
+        .filter((cat) => (cat.productCount || 0) > 0)
+        .sort((a, b) => (a.name || "").localeCompare(b.name || "", "vi", { sensitivity: "base", numeric: true })),
+    [categoriesQuery.data]
+  );
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -37,7 +48,7 @@ export function SeniorHeroSearchWidget({ categories = [] }) {
                 <option value="">✨ Tất cả các danh mục</option>
                 {categories.map((cat) => (
                   <option key={cat.id} value={cat.id}>
-                    {cat.name}
+                    {cat.name} ({cat.productCount})
                   </option>
                 ))}
               </select>

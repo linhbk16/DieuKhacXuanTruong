@@ -34,7 +34,7 @@ export function HomePage() {
         description={data.settings?.metaDescription}
       />
       <HeroSlider banners={data.banners} />
-      <SeniorHeroSearchWidget categories={data.featuredCategories} />
+      <SeniorHeroSearchWidget />
       <IntroSection sections={data.homepage?.sections} />
       <CapabilityGallery compact />
       <CategoryHighlights categories={data.featuredCategories} />
