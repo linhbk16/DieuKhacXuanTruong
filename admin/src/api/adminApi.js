@@ -15,6 +15,7 @@ export const adminApi = {
   createCategory: async (payload) => unwrap(await client.post("/admin/categories", payload)),
   updateCategory: async (id, payload) => unwrap(await client.put(`/admin/categories/${id}`, payload)),
   deleteCategory: async (id) => unwrap(await client.delete(`/admin/categories/${id}`)),
+  mergeCategory: async (id, targetId) => unwrap(await client.post(`/admin/categories/${id}/merge`, { targetId })),
   getProducts: async (params = {}) => unwrap(await client.get("/admin/products", { params })),
   getProduct: async (id) => unwrap(await client.get(`/admin/products/${id}`)),
   createProduct: async (payload) => unwrap(await client.post("/admin/products", payload)),

@@ -26,3 +26,13 @@ export const categoryUpdateSchema = z.object({
   }),
   query: z.object({}).optional()
 });
+
+export const categoryMergeSchema = z.object({
+  body: z.object({
+    targetId: objectIdSchema
+  }),
+  params: z.object({
+    id: objectIdSchema
+  }),
+  query: z.object({}).optional()
+});

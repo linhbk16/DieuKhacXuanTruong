@@ -3,6 +3,7 @@ import {
   deleteCategory,
   getCategories,
   getCategoryById,
+  mergeCategory,
   updateCategory
 } from "../services/category.service.js";
 
@@ -29,4 +30,9 @@ export const editCategory = async (req, res) => {
 export const destroyCategory = async (req, res) => {
   await deleteCategory(req.params.id);
   res.json({ success: true, message: "Category deleted" });
+};
+
+export const mergeCategoryInto = async (req, res) => {
+  const data = await mergeCategory(req.params.id, req.validated.body.targetId);
+  res.json({ success: true, message: "Category merged", data });
 };

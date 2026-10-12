@@ -19,6 +19,7 @@ import { adminApi } from "../api/adminApi";
 import { ImageUploadField } from "../components/common/ImageUploadField";
 import { PageHeaderCard } from "../components/common/PageHeaderCard";
 import { StatusTag } from "../components/common/StatusTag";
+import { getApiErrorMessage } from "../utils/formFeedback";
 
 export function CategoriesPage() {
   const navigate = useNavigate();
@@ -26,6 +27,8 @@ export function CategoriesPage() {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form] = Form.useForm();
+  const [mergeSource, setMergeSource] = useState(null);
+  const [mergeTargetId, setMergeTargetId] = useState(null);
 
   const categoriesQuery = useQuery({
     queryKey: ["admin-categories"],
@@ -53,7 +56,8 @@ export function CategoriesPage() {
       setEditing(null);
       form.resetFields();
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-    }
+    },
+    onError: (error) => message.error(getApiErrorMessage(error, "Không thể lưu danh mục."))
   });
 
   const deleteMutation = useMutation({
@@ -61,8 +65,27 @@ export function CategoriesPage() {
     onSuccess: () => {
       message.success("Đã xóa danh mục.");
       queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
-    }
+    },
+    onError: (error) => message.error(getApiErrorMessage(error, "Không thể xóa danh mục."))
   });
+
+  // Merge: move every product of one category into another, then remove the empty one.
+  const mergeMutation = useMutation({
+    mutationFn: () => adminApi.mergeCategory(mergeSource.id, mergeTargetId),
+    onSuccess: (data) => {
+      message.success(`Đã chuyển ${data?.movedCount ?? 0} mục sang "${data?.target?.name}" và xóa "${mergeSource.name}".`);
+      setMergeSource(null);
+      setMergeTargetId(null);
+      queryClient.invalidateQueries({ queryKey: ["admin-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-product-categories"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-products"] });
+    },
+    onError: (error) => message.error(getApiErrorMessage(error, "Không thể gộp danh mục."))
+  });
+
+  const mergeTargets = (categoriesQuery.data?.items || [])
+    .filter((item) => mergeSource && item.type === mergeSource.type && item.id !== mergeSource.id)
+    .sort((a, b) => (a.name || "").localeCompare(b.name || "", "vi", { sensitivity: "base", numeric: true }));
 
   const openEdit = (record) => {
     setEditing(record);
@@ -125,6 +148,7 @@ export function CategoriesPage() {
             </Button>
           )}
           <Button size="small" onClick={() => openEdit(record)}>Sửa</Button>
+          <Button size="small" onClick={() => setMergeSource(record)}>Gộp</Button>
           <Popconfirm title="Xóa danh mục này?" okText="Xóa" cancelText="Hủy" onConfirm={() => deleteMutation.mutate(record.id)}>
             <Button size="small" danger>Xóa</Button>
           </Popconfirm>
@@ -193,6 +217,37 @@ export function CategoriesPage() {
             </Form.Item>
           </Space>
         </Form>
+      </Modal>
+
+      <Modal
+        open={Boolean(mergeSource)}
+        title={`Gộp danh mục "${mergeSource?.name || ""}"`}
+        okText="Gộp danh mục"
+        cancelText="Hủy"
+        okButtonProps={{ disabled: !mergeTargetId, loading: mergeMutation.isPending, danger: true }}
+        onCancel={() => {
+          setMergeSource(null);
+          setMergeTargetId(null);
+        }}
+        onOk={() => mergeMutation.mutate()}
+      >
+        <p>
+          Toàn bộ {mergeSource?.type === "PRODUCT" ? `${mergeSource?.productCount || 0} sản phẩm` : "công trình"} của{" "}
+          <strong>{mergeSource?.name}</strong> sẽ chuyển sang danh mục bạn chọn, sau đó danh mục{" "}
+          <strong>{mergeSource?.name}</strong> bị xóa.
+        </p>
+        <Select
+          showSearch
+          style={{ width: "100%" }}
+          placeholder="Chọn danh mục đích"
+          value={mergeTargetId}
+          onChange={setMergeTargetId}
+          optionFilterProp="label"
+          options={mergeTargets.map((item) => ({
+            value: item.id,
+            label: item.type === "PRODUCT" ? `${item.name} (${item.productCount || 0})` : item.name
+          }))}
+        />
       </Modal>
     </div>
   );

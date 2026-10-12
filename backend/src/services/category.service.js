@@ -1,4 +1,4 @@
-import { Category, Product } from "../models/index.js";
+import { Category, Product, Project } from "../models/index.js";
 import { ApiError } from "../utils/apiError.js";
 import { getPagination, buildPaginationMeta } from "../utils/pagination.js";
 import { ensureUniqueSlug } from "../utils/slug.js";
@@ -28,6 +28,22 @@ const buildCategoryWhere = (query = {}, publicOnly = false) => {
 };
 
 const serializeCategory = (category) => category.toJSON();
+
+// Items that point to a category, by category type.
+const getItemModel = (type) => (type === "PROJECT" ? Project : Product);
+
+// Two categories with the same name split the same items (e.g. "Con tiện" vs "con tiện"), so block it.
+const assertUniqueName = async (type, name, excludeId = null) => {
+  const where = { type, name: new RegExp(`^${escapeRegex(name.trim())}$`, "i") };
+  if (excludeId) where._id = { $ne: excludeId };
+  const existing = await Category.findOne(where);
+  if (existing) {
+    throw new ApiError(
+      409,
+      `Đã có danh mục "${existing.name}". Hãy dùng chức năng Gộp danh mục để chuyển sản phẩm sang danh mục đó.`
+    );
+  }
+};
 
 const attachProductCounts = async (rows, publicOnly = false) => {
   if (!rows.length) return [];
@@ -84,6 +100,7 @@ export const getCategoryById = async (id) => {
 };
 
 export const createCategory = async (payload) => {
+  await assertUniqueName(payload.type, sanitizePlainText(payload.name));
   const slug = await ensureUniqueSlug(Category, payload.slug || payload.name);
   const category = await Category.create({
     ...payload,
@@ -100,6 +117,8 @@ export const updateCategory = async (id, payload) => {
     throw new ApiError(404, "Category not found");
   }
 
+  // Items keep categoryId, so renaming A to B moves every item of A to B automatically.
+  await assertUniqueName(payload.type || category.type, sanitizePlainText(payload.name), id);
   const slug = await ensureUniqueSlug(Category, payload.slug || payload.name, id);
 
   category.set({
@@ -119,5 +138,36 @@ export const deleteCategory = async (id) => {
     throw new ApiError(404, "Category not found");
   }
 
+  const itemCount = await getItemModel(category.type).countDocuments({ categoryId: category._id });
+  if (itemCount > 0) {
+    throw new ApiError(
+      409,
+      `Danh mục "${category.name}" còn ${itemCount} mục. Hãy gộp sang danh mục khác trước khi xóa.`
+    );
+  }
+
   await category.deleteOne();
+};
+
+// Move every item of `sourceId` into `targetId`, then delete the now empty source category.
+export const mergeCategory = async (sourceId, targetId) => {
+  if (String(sourceId) === String(targetId)) {
+    throw new ApiError(400, "Không thể gộp danh mục vào chính nó.");
+  }
+
+  const [source, target] = await Promise.all([Category.findById(sourceId), Category.findById(targetId)]);
+  if (!source || !target) {
+    throw new ApiError(404, "Category not found");
+  }
+  if (source.type !== target.type) {
+    throw new ApiError(400, "Chỉ gộp được hai danh mục cùng loại.");
+  }
+
+  const result = await getItemModel(source.type).updateMany(
+    { categoryId: source._id },
+    { $set: { categoryId: target._id } }
+  );
+  await source.deleteOne();
+
+  return { target: serializeCategory(target), movedCount: result.modifiedCount };
 };
