@@ -4,6 +4,7 @@ import { useInfiniteQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
 import { publicApi } from "../api/publicApi";
 import { EmptyState } from "../components/common/EmptyState";
+import { HeaderSearchModal } from "../components/common/HeaderSearchModal";
 import { ErrorState } from "../components/common/ErrorState";
 import { LoadingScreen } from "../components/common/LoadingScreen";
 import { Seo } from "../components/common/Seo";
@@ -11,37 +12,16 @@ import { CatalogCategorySelect } from "../components/product/CatalogCategorySele
 import { ProductCard } from "../components/product/ProductCard";
 import { useProductCategories } from "../hooks/useSiteData";
 
-const getCategoryIcon = (name = "") => {
-  const lower = name.toLowerCase();
-  if (lower.includes("cột") || lower.includes("đấu")) return "🏛️";
-  if (lower.includes("phù điêu") || lower.includes("hoa văn")) return "⚜️";
-  if (lower.includes("phào") || lower.includes("chỉ")) return "🪟";
-  if (lower.includes("tượng")) return "🗿";
-  if (lower.includes("con tiện") || lower.includes("lục bình")) return "🏺";
-  if (lower.includes("trần") || lower.includes("mâm")) return "☸️";
-  if (lower.includes("góc") || lower.includes("con bọ")) return "📐";
-  return "🏛️";
-};
-
 export function ProductsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const categoriesQuery = useProductCategories();
   const loadMoreRef = useRef(null);
-  const modalCloseRef = useRef(null);
   const viewMode = "grid";
 
   const filters = {
     search: searchParams.get("search") || "",
     categoryId: searchParams.get("categoryId") || "",
   };
-
-  // Local search state to prevent focus loss during rapid typing
-  const [searchInput, setSearchInput] = useState(filters.search);
-
-  // Sync internal state when URL changes externally
-  useEffect(() => {
-    setSearchInput(filters.search);
-  }, [filters.search]);
 
   const [filterModalOpen, setFilterModalOpen] = useState(false);
   const [slotEl, setSlotEl] = useState(() =>
@@ -67,26 +47,6 @@ export function ProductsPage() {
     return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, []);
 
-  // Focus a non-input control so opening categories does not raise the mobile keyboard.
-  useEffect(() => {
-    if (filterModalOpen) {
-      document.body.style.overflow = "hidden";
-      const timer = setTimeout(() => {
-        modalCloseRef.current?.focus({ preventScroll: true });
-      }, 100);
-      const handleKeyDown = (e) => {
-        if (e.key === "Escape") setFilterModalOpen(false);
-      };
-      window.addEventListener("keydown", handleKeyDown);
-      return () => {
-        clearTimeout(timer);
-        document.body.style.overflow = "";
-        window.removeEventListener("keydown", handleKeyDown);
-      };
-    }
-    document.body.style.overflow = "";
-  }, [filterModalOpen]);
-
   const updateFilters = (next) => {
     const params = new URLSearchParams();
     if (next.search) params.set("search", next.search);
@@ -97,20 +57,8 @@ export function ProductsPage() {
   // Picking a category applies it right away and shows the products, no extra confirm step.
   const selectCategory = (categoryId) => {
     updateFilters({ ...filters, categoryId });
-    setFilterModalOpen(false);
-    // Wait for the modal to unlock body scroll before jumping back to the product list.
-    setTimeout(() => window.scrollTo({ top: 0 }), 50);
+    window.scrollTo({ top: 0 });
   };
-
-  // Debounced search to avoid triggering reload / unmount on every keystroke
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchInput !== filters.search) {
-        updateFilters({ ...filters, search: searchInput });
-      }
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [searchInput]);
 
   const productsQuery = useInfiniteQuery({
     queryKey: ["public-products", filters, "category-popularity"],
@@ -233,7 +181,6 @@ export function ProductsPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setSearchInput("");
                     updateFilters({ ...filters, search: "" });
                   }}
                   aria-label="Xóa từ khóa tìm kiếm"
@@ -320,8 +267,7 @@ export function ProductsPage() {
                     type="button"
                     className="button button--primary"
                     onClick={() => {
-                      setSearchInput("");
-                      updateFilters({ categoryId: "", search: "" });
+                        updateFilters({ categoryId: "", search: "" });
                     }}
                   >
                     ✕ Bỏ lọc để xem tất cả sản phẩm
@@ -397,178 +343,12 @@ export function ProductsPage() {
           )
         : null}
 
-      {/* Unified Filter & Search Modal (Centered luxury modal on desktop/laptop, smooth bottom sheet on mobile) */}
-      {filterModalOpen && (
-        <div
-          className="catalog-modal-root"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Bộ lọc và tìm kiếm sản phẩm"
-        >
-          <div
-            className="catalog-modal__backdrop"
-            onClick={() => setFilterModalOpen(false)}
-          />
-          <div className="catalog-modal__dialog">
-            {/* Mobile drag handle */}
-            <div className="catalog-modal__drag-handle" />
-
-            {/* Header */}
-            <div className="catalog-modal__header">
-              <div className="catalog-modal__header-titles">
-                <h3 className="catalog-modal__title">
-                  🏛️ Tìm kiếm sản phẩm
-                </h3>
-                <p className="catalog-modal__subtitle">
-                  Chọn danh mục hoặc tìm theo tên, kích thước sản phẩm
-                </p>
-              </div>
-              <button
-                type="button"
-                className="catalog-modal__close-btn"
-                ref={modalCloseRef}
-                onClick={() => setFilterModalOpen(false)}
-                aria-label="Đóng bộ lọc"
-                title="Đóng (Esc)"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="catalog-modal__body">
-              {/* Categories come first; the list scrolls independently on small screens. */}
-              <div className="catalog-modal__section">
-                <div className="modal-section-head">
-                  <span className="modal-section-label">🏛️ Danh mục sản phẩm</span>
-                  {filters.categoryId ? (
-                    <button
-                      type="button"
-                      className="modal-section-action-btn"
-                      onClick={() => updateFilters({ ...filters, categoryId: "" })}
-                    >
-                      Xem tất cả danh mục
-                    </button>
-                  ) : (
-                    <span className="modal-section-hint">Tất cả {categories.length} danh mục</span>
-                  )}
-                </div>
-
-                <div className="modal-categories-grid">
-                  <button
-                    type="button"
-                    className={`modal-category-card ${!filters.categoryId ? "active" : ""}`}
-                    onClick={() => selectCategory("")}
-                  >
-                    <div className="modal-category-card__left">
-                      <span className="modal-category-card__icon">✨</span>
-                      <div className="modal-category-card__text">
-                        <span className="modal-category-card__name">Tất cả danh mục</span>
-                        <span className="modal-category-card__count">Xem toàn bộ sản phẩm</span>
-                      </div>
-                    </div>
-                    <span className="modal-category-card__check">
-                      {!filters.categoryId ? "✓" : ""}
-                    </span>
-                  </button>
-
-                  {alphabeticalCategories.map((cat) => {
-                    const isSelected = filters.categoryId === cat.id;
-                    const count = cat.productCount || 0;
-                    return (
-                      <button
-                        key={cat.id}
-                        type="button"
-                        className={`modal-category-card ${isSelected ? "active" : ""} ${count === 0 ? "modal-category-card--empty" : ""}`}
-                        onClick={() => selectCategory(cat.id)}
-                      >
-                        <div className="modal-category-card__left">
-                          <span className="modal-category-card__icon">{getCategoryIcon(cat.name)}</span>
-                          <div className="modal-category-card__text">
-                            <span className="modal-category-card__name">{cat.name}</span>
-                            <span className={`modal-category-card__count ${count > 0 ? "has-items" : "no-items"}`}>
-                              {count > 0 ? `${count} mẫu sẵn có` : "Đang cập nhật mẫu"}
-                            </span>
-                          </div>
-                        </div>
-                        <span className="modal-category-card__check">
-                          {isSelected ? "✓" : ""}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="catalog-modal__section">
-                <label className="modal-section-label" htmlFor="catalog-modal-search">
-                  🔍 Tìm kiếm theo tên hoặc kích thước
-                </label>
-                <div className="modal-search-box">
-                  <span className="modal-search-box__icon">🔍</span>
-                  <input
-                    id="catalog-modal-search"
-                    type="text"
-                    className="modal-search-box__input"
-                    placeholder="Vd: 60x85, D40, đầu cột, phù điêu..."
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                  />
-                  {searchInput ? (
-                    <button
-                      type="button"
-                      className="modal-search-box__clear"
-                      onClick={() => {
-                        setSearchInput("");
-                        updateFilters({ ...filters, search: "" });
-                      }}
-                      aria-label="Xóa từ khóa"
-                    >
-                      ✕
-                    </button>
-                  ) : null}
-                </div>
-                {searchInput ? (
-                  <div className="modal-live-match-indicator" aria-live="polite">
-                    <span className="modal-live-match-text">
-                      {productsQuery.isFetching || searchInput !== filters.search
-                        ? "Đang tìm kiếm..."
-                        : `Tìm thấy ${totalItems} sản phẩm phù hợp`}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="catalog-modal__footer">
-              {hasActiveFilter ? (
-                <button
-                  type="button"
-                  className="modal-footer__clear-btn"
-                  onClick={() => {
-                    setSearchInput("");
-                    updateFilters({ categoryId: "", search: "" });
-                  }}
-                >
-                  ✕ Bỏ tất cả lọc
-                </button>
-              ) : (
-                <span className="modal-footer__status">
-                  Đang hiển thị {displayProducts.length} sản phẩm
-                </span>
-              )}
-
-              <button
-                type="button"
-                className="modal-footer__apply-btn"
-                onClick={() => setFilterModalOpen(false)}
-              >
-                Xem kết quả ({totalItems} sản phẩm) →
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Same search popup as the header search button */}
+      <HeaderSearchModal
+        open={filterModalOpen}
+        onClose={() => setFilterModalOpen(false)}
+        activeCategoryId={filters.categoryId}
+      />
     </>
   );
 }

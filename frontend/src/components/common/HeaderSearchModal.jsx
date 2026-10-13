@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import { publicApi } from "../../api/publicApi";
 import { useProductCategories } from "../../hooks/useSiteData";
 
-export function HeaderSearchModal({ open, onClose }) {
+export function HeaderSearchModal({ open, onClose, activeCategoryId = null }) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const inputRef = useRef(null);
   const navigate = useNavigate();
   const categoriesQuery = useProductCategories();
   const categories = [...(categoriesQuery.data?.items || [])].sort(
@@ -21,12 +22,23 @@ export function HeaderSearchModal({ open, onClose }) {
       return;
     }
 
+    // Only autofocus with a mouse: on phones the keyboard opens when the user taps the input.
+    if (window.matchMedia?.("(pointer: fine)").matches) {
+      inputRef.current?.focus({ preventScroll: true });
+    }
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
     const handleKeyDown = (e) => {
       if (e.key === "Escape") onClose();
     };
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [open, onClose]);
 
   // Live search debounce
@@ -54,6 +66,11 @@ export function HeaderSearchModal({ open, onClose }) {
 
   if (!open || typeof document === "undefined") return null;
 
+  const handleCategoryClick = () => {
+    onClose();
+    window.scrollTo({ top: 0 });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (query.trim()) {
@@ -78,7 +95,7 @@ export function HeaderSearchModal({ open, onClose }) {
               placeholder="Tìm sản phẩm, phù điêu, hoa văn..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              autoFocus
+              ref={inputRef}
             />
             {query && (
               <button
@@ -154,12 +171,19 @@ export function HeaderSearchModal({ open, onClose }) {
               <div className="header-search-popular">
                 <span className="header-search-section-label">Danh mục sản phẩm</span>
                 <div className="header-search-tags">
+                  <Link
+                    to="/san-pham"
+                    className={`header-search-tag-chip ${activeCategoryId === "" ? "is-active" : ""}`}
+                    onClick={handleCategoryClick}
+                  >
+                    Tất cả sản phẩm
+                  </Link>
                   {categories.map((category) => (
                     <Link
                       key={category.id}
                       to={`/san-pham?categoryId=${category.id}`}
-                      className="header-search-tag-chip"
-                      onClick={onClose}
+                      className={`header-search-tag-chip ${category.id === activeCategoryId ? "is-active" : ""}`}
+                      onClick={handleCategoryClick}
                     >
                       {category.name}
                     </Link>

@@ -11,7 +11,9 @@ import {
   MailOutlined,
   SettingOutlined,
 } from "@ant-design/icons";
+import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { adminApi } from "../../api/adminApi";
 import { useAuth } from "../../context/AuthContext";
 
 const { Header, Sider, Content } = Layout;
@@ -64,6 +66,14 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [welcomeOpen, setWelcomeOpen] = useState(false);
+  // Same query key as the Settings page, so a new logo shows up right after saving.
+  const { data: settings } = useQuery({
+    queryKey: ["admin-settings"],
+    queryFn: adminApi.getSettings,
+    enabled: Boolean(user),
+    staleTime: 1000 * 60 * 5,
+  });
+  const companyName = settings?.companyName || "Điêu Khắc Xuân Trường";
 
   const match = menuItems.find(
     (item) =>
@@ -90,9 +100,13 @@ export function AdminLayout() {
     <Layout className="admin-shell">
       <Sider breakpoint="lg" collapsedWidth="0" theme="light" width={260}>
         <div className="admin-logo">
-          <span>DK</span>
+          {settings?.logoUrl ? (
+            <img className="admin-logo__image" src={settings.logoUrl} alt={companyName} />
+          ) : (
+            <span>DK</span>
+          )}
           <div>
-            <strong>Điêu Khắc Xuân Trường</strong>
+            <strong>{companyName}</strong>
           </div>
         </div>
         <Menu mode="inline" selectedKeys={[selectedKey]} items={menuItems} />
